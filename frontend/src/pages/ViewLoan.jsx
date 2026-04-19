@@ -1,80 +1,118 @@
 import { useState } from 'react'
 import { viewLoan } from '../api/client'
+import ErrorPanel from '../components/ErrorPanel'
 
 export default function ViewLoan() {
-  const [loanId, setLoanId] = useState('')
+  const [loanId, setLoanId]   = useState('')
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult]   = useState(null)
+  const [error, setError]     = useState(null)
 
-  const handleSubmit = async e => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true); setResult(null); setError(null)
     try {
       const { data } = await viewLoan(loanId.trim())
       setResult(data)
     } catch (err) {
-      setError(err.response?.data || { detail: 'Network error — is the Django backend running?' })
+      setError(err?.response?.data ?? { detail: 'Network error — is the backend running?' })
     } finally { setLoading(false) }
   }
 
   return (
-    <div>
-      <div className="page-header">
-        <h1>📄 View Loan Details</h1>
-        <p>Look up full loan information including customer profile, interest rate, EMI, and tenure by Loan ID.</p>
-      </div>
+    <div className="max-w-4xl mx-auto px-6 pt-12 pb-12">
+      <header className="mb-10">
+        <span className="text-primary text-[0.75rem] uppercase tracking-[0.1em] font-bold mb-2 block">
+          Loan Records
+        </span>
+        <h1 className="text-4xl font-extrabold tracking-tight text-on-surface">View Loan</h1>
+        <p className="text-on-surface-variant mt-3 text-lg max-w-lg">
+          Retrieve full loan details including customer profile, interest rate, EMI, and tenure by Loan ID.
+        </p>
+      </header>
 
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div className="form-field" style={{ flex: '1 1 200px' }}>
-            <label className="form-label">Loan ID</label>
-            <input className="form-input" type="number" placeholder="e.g. 9997"
-              value={loanId} onChange={e => setLoanId(e.target.value)} required />
+      {/* Search */}
+      <div className="glass-panel p-6 rounded-3xl mb-8">
+        <form onSubmit={handleSubmit} className="flex gap-4 items-end flex-wrap">
+          <div className="space-y-2 flex-1 min-w-[200px]">
+            <label className="lv-label">Loan ID</label>
+            <input
+              className="lv-input"
+              type="number"
+              placeholder="e.g. 9997"
+              value={loanId}
+              onChange={e => setLoanId(e.target.value)}
+              required
+            />
           </div>
-          <button className="btn btn-primary" type="submit" disabled={loading}>
-            {loading ? <><span className="spinner" /> Fetching…</> : '🔎 Lookup Loan'}
+          <button type="submit" disabled={loading} className="lv-btn flex items-center gap-2">
+            {loading
+              ? <><span className="lv-spinner" style={{ borderTopColor: '#00600e' }} />Fetching…</>
+              : <><span className="material-symbols-outlined text-lg">search</span> Lookup Loan</>}
           </button>
         </form>
       </div>
 
+      <ErrorPanel error={error} />
+
       {result && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lv-result">
           {/* Loan Details Card */}
-          <div className="card">
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.04em' }}>
-              📋 Loan Details
+          <div className="glass-panel p-6 rounded-3xl relative overflow-hidden">
+            <div className="absolute -right-8 -top-8 w-32 h-32 bg-primary/10 blur-[48px] rounded-full pointer-events-none" />
+            <div className="flex items-center gap-2 mb-6">
+              <span className="material-symbols-outlined text-primary text-xl">receipt_long</span>
+              <span className="text-[0.75rem] uppercase tracking-widest font-bold text-outline">Loan Details</span>
             </div>
-            <div className="kv-list">
-              <div className="kv-item"><div className="kv-key">Loan ID</div><div className="kv-val" style={{ color: 'var(--accent)' }}>#{result.loan_id}</div></div>
-              <div className="kv-item"><div className="kv-key">Loan Amount</div><div className="kv-val">₹{Number(result.loan_amount).toLocaleString('en-IN')}</div></div>
-              <div className="kv-item"><div className="kv-key">Interest Rate</div><div className="kv-val">{result.interest_rate}%</div></div>
-              <div className="kv-item"><div className="kv-key">Monthly EMI</div><div className="kv-val">₹{Number(result.monthly_installment).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div></div>
-              <div className="kv-item"><div className="kv-key">Tenure</div><div className="kv-val">{result.tenure} months</div></div>
+            <div className="space-y-4">
+              {[
+                { label: 'Loan ID',      value: `#${result.loan_id}`,  accent: true },
+                { label: 'Loan Amount',  value: `₹${Number(result.loan_amount).toLocaleString('en-IN')}` },
+                { label: 'Interest Rate',value: `${result.interest_rate}%` },
+                { label: 'Monthly EMI',  value: `₹${Number(result.monthly_installment).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+                { label: 'Tenure',       value: `${result.tenure} months` },
+              ].map(item => (
+                <div key={item.label} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                  <span className="text-on-surface-variant text-sm">{item.label}</span>
+                  <span className={`font-bold ${item.accent ? 'text-primary' : 'text-on-surface'}`}>{item.value}</span>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Customer Details Card */}
+          {/* Customer Profile Card */}
           {result.customer && (
-            <div className="card">
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.04em' }}>
-                👤 Customer Profile
+            <div className="glass-panel p-6 rounded-3xl relative overflow-hidden">
+              <div className="absolute -left-8 -bottom-8 w-32 h-32 bg-secondary/10 blur-[48px] rounded-full pointer-events-none" />
+              <div className="flex items-center gap-2 mb-6">
+                <span className="material-symbols-outlined text-secondary text-xl">person</span>
+                <span className="text-[0.75rem] uppercase tracking-widest font-bold text-outline">Customer Profile</span>
               </div>
-              <div className="kv-list">
-                <div className="kv-item"><div className="kv-key">Customer ID</div><div className="kv-val" style={{ color: 'var(--accent)' }}>#{result.customer.id}</div></div>
-                <div className="kv-item"><div className="kv-key">Name</div><div className="kv-val">{result.customer.first_name} {result.customer.last_name}</div></div>
-                <div className="kv-item"><div className="kv-key">Age</div><div className="kv-val">{result.customer.age}</div></div>
-                <div className="kv-item"><div className="kv-key">Phone</div><div className="kv-val">{result.customer.phone_number}</div></div>
+              {/* Avatar placeholder */}
+              <div className="flex items-center gap-4 mb-6 p-4 rounded-2xl bg-surface-container-low border border-white/5">
+                <div className="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center flex-shrink-0">
+                  <span className="material-symbols-outlined text-on-surface-variant text-2xl">person</span>
+                </div>
+                <div>
+                  <div className="text-on-surface font-bold">
+                    {result.customer.first_name} {result.customer.last_name}
+                  </div>
+                  <div className="text-on-surface-variant text-sm">#{result.customer.id}</div>
+                </div>
+              </div>
+              <div className="space-y-4">
+                {[
+                  { label: 'Age',   value: `${result.customer.age} years` },
+                  { label: 'Phone', value: result.customer.phone_number },
+                ].map(item => (
+                  <div key={item.label} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                    <span className="text-on-surface-variant text-sm">{item.label}</span>
+                    <span className="font-bold text-on-surface">{item.value}</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {error && (
-        <div className="result-panel result-error">
-          <div className="result-title" style={{ color: 'var(--danger)' }}>✖ Not Found / Error</div>
-          <pre style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{JSON.stringify(error, null, 2)}</pre>
         </div>
       )}
     </div>

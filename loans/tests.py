@@ -1,4 +1,3 @@
-import json
 from decimal import Decimal
 from django.test import TestCase
 from django.urls import reverse
@@ -6,6 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from .models import Customer, Loan
 from .services import CreditScoreCalculator, EMICalculator, LoanEligibilityChecker, LoanService
+from .serializers import LoanRequestSerializer
 
 
 class CreditScoreCalculatorTest(TestCase):

@@ -1,111 +1,223 @@
-import { useState } from 'react'
 import { checkEligibility } from '../api/client'
+import { useApiForm } from '../hooks/useApiForm'
+import ErrorPanel from '../components/ErrorPanel'
 
 const initialForm = { customer_id: '', loan_amount: '', interest_rate: '', tenure: '' }
 
-function CreditGauge({ score }) {
-  const pct = (score / 100) * 100
-  let color = '#ef4444'; let label = 'Poor'
-  if (score > 50) { color = '#10b981'; label = 'Good' }
-  else if (score > 30) { color = '#f59e0b'; label = 'Fair' }
-  else if (score > 10) { color = '#f97316'; label = 'Low' }
+const FIELDS = [
+  { name: 'customer_id',   label: 'Customer ID',       type: 'number', placeholder: 'e.g. 302' },
+  { name: 'loan_amount',   label: 'Loan Amount (₹)',   type: 'number', placeholder: '500,000' },
+  { name: 'interest_rate', label: 'Interest Rate (%)', type: 'number', placeholder: '10.00', step: '0.01' },
+]
+
+const TENURE_OPTIONS = [12, 24, 36, 48, 60]
+
+function buildPayload(form) {
+  return {
+    customer_id:   parseInt(form.customer_id),
+    loan_amount:   parseFloat(form.loan_amount),
+    interest_rate: parseFloat(form.interest_rate),
+    tenure:        parseInt(form.tenure) || 12,
+  }
+}
+
+function CreditRing({ score }) {
+  const pct = Math.min(100, Math.max(0, score))
+  const circumference = 314
+  const dash = (pct / 100) * circumference
+  let color = '#ff7351'; let label = 'Poor'
+  if (score > 50) { color = '#81fd77'; label = 'Good' }
+  else if (score > 30) { color = '#87f7a6'; label = 'Fair' }
+  else if (score > 10) { color = '#97f4ff'; label = 'Low' }
   return (
-    <div className="score-ring-wrap">
-      <svg width="120" height="120" viewBox="0 0 120 120">
-        <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(99,102,241,0.1)" strokeWidth="12" />
-        <circle cx="60" cy="60" r="50" fill="none" stroke={color} strokeWidth="12"
-          strokeDasharray={`${(pct / 100) * 314} 314`} strokeLinecap="round"
-          transform="rotate(-90 60 60)" style={{ transition: 'stroke-dasharray 0.8s ease' }} />
-        <text x="60" y="55" textAnchor="middle" fill={color} fontSize="22" fontWeight="800">{score}</text>
-        <text x="60" y="72" textAnchor="middle" fill="#94a3b8" fontSize="11">{label}</text>
+    <div className="flex flex-col items-center gap-2 py-4">
+      <svg width="130" height="130" viewBox="0 0 120 120">
+        <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(129,253,119,0.08)" strokeWidth="10" />
+        <circle cx="60" cy="60" r="50" fill="none" stroke={color} strokeWidth="10"
+          strokeDasharray={`${dash} ${circumference}`} strokeLinecap="round"
+          transform="rotate(-90 60 60)"
+          style={{ transition: 'stroke-dasharray 0.9s cubic-bezier(.4,0,.2,1)', filter: `drop-shadow(0 0 8px ${color}60)` }}
+        />
+        <text x="60" y="56" textAnchor="middle" fill={color} fontSize="24" fontWeight="900">{score}</text>
+        <text x="60" y="73" textAnchor="middle" fill="#8bb591" fontSize="11">{label}</text>
       </svg>
-      <div className="score-ring-label">Credit Score</div>
+      <span className="text-[0.65rem] uppercase tracking-widest font-bold text-outline">Credit Score</span>
     </div>
   )
 }
 
 export default function CheckEligibility() {
-  const [form, setForm] = useState(initialForm)
-  const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
-
-  const handleChange = e => setForm(p => ({ ...p, [e.target.name]: e.target.value }))
-
-  const handleSubmit = async e => {
-    e.preventDefault()
-    setLoading(true); setResult(null); setError(null)
-    try {
-      const { data } = await checkEligibility({
-        customer_id: parseInt(form.customer_id),
-        loan_amount: parseFloat(form.loan_amount),
-        interest_rate: parseFloat(form.interest_rate),
-        tenure: parseInt(form.tenure),
-      })
-      setResult(data)
-    } catch (err) {
-      setError(err.response?.data || { detail: 'Network error — is the Django backend running?' })
-    } finally { setLoading(false) }
-  }
+  const { form, loading, result, error, handleChange, handleSubmit } =
+    useApiForm(checkEligibility, initialForm)
 
   const approved = result?.approval
 
   return (
-    <div>
-      <div className="page-header">
-        <h1>🔍 Check Loan Eligibility</h1>
-        <p>Evaluate loan eligibility before committing. Uses a 4-factor credit score model (payment history, loan count, activity, utilization).</p>
-      </div>
+    <div className="max-w-7xl mx-auto px-6 pt-12 grid grid-cols-1 lg:grid-cols-12 gap-8">
+      {/* ── Left: Form ── */}
+      <div className="lg:col-span-7">
+        <header className="mb-10">
+          <span className="text-primary text-[0.75rem] uppercase tracking-[0.1em] font-bold mb-2 block">
+            Lending Terminal
+          </span>
+          <h1 className="text-4xl font-extrabold tracking-tight text-on-surface">Eligibility Check</h1>
+          <p className="text-on-surface-variant mt-3 text-lg max-w-md">
+            Evaluate loan eligibility using our 4-factor credit score model before committing.
+          </p>
+        </header>
 
-      <div className="card">
-        <form onSubmit={handleSubmit}>
-          <div className="form-grid" style={{ marginBottom: '1.5rem' }}>
-            {[
-              { name: 'customer_id', label: 'Customer ID', type: 'number', placeholder: '302' },
-              { name: 'loan_amount', label: 'Loan Amount (₹)', type: 'number', placeholder: '500000' },
-              { name: 'interest_rate', label: 'Interest Rate (%)', type: 'number', placeholder: '10', step: '0.01' },
-              { name: 'tenure', label: 'Tenure (months)', type: 'number', placeholder: '24' },
-            ].map(f => (
-              <div className="form-field" key={f.name}>
-                <label className="form-label">{f.label}</label>
-                <input className="form-input" type={f.type} name={f.name} placeholder={f.placeholder}
-                  step={f.step} value={form[f.name]} onChange={handleChange} required />
+        <form onSubmit={handleSubmit(buildPayload)} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {FIELDS.map(f => (
+              <div key={f.name} className="space-y-2">
+                <label className="lv-label">{f.label}</label>
+                <input
+                  className="lv-input"
+                  type={f.type}
+                  name={f.name}
+                  placeholder={f.placeholder}
+                  step={f.step}
+                  value={form[f.name]}
+                  onChange={handleChange}
+                  required
+                />
               </div>
             ))}
+            {/* Tenure select */}
+            <div className="space-y-2">
+              <label className="lv-label">Tenure (Months)</label>
+              <select
+                className="lv-input appearance-none cursor-pointer"
+                name="tenure"
+                value={form.tenure}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Select tenure…</option>
+                {TENURE_OPTIONS.map(t => (
+                  <option key={t} value={t}>{t} Months</option>
+                ))}
+              </select>
+            </div>
           </div>
-          <button className="btn btn-primary" type="submit" disabled={loading}>
-            {loading ? <><span className="spinner" /> Checking…</> : '🔍 Check Eligibility'}
-          </button>
+
+          <div className="pt-2">
+            <button type="submit" disabled={loading} className="lv-btn w-full md:w-auto flex items-center justify-center gap-2">
+              {loading
+                ? <><span className="lv-spinner" style={{ borderTopColor: '#00600e' }} />Analysing…</>
+                : <><span className="material-symbols-outlined text-lg">analytics</span> Check Eligibility</>}
+            </button>
+          </div>
         </form>
 
-        {result && (
-          <div className={`result-panel ${approved ? 'result-success' : 'result-error'}`}>
-            <div className="result-title" style={{ color: approved ? 'var(--success)' : 'var(--danger)' }}>
-              {approved ? '✔ Loan Eligible' : '✖ Loan Not Eligible'}
-            </div>
-            <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              <CreditGauge score={result.credit_score ?? 0} />
-              <div className="kv-list" style={{ flex: 1 }}>
-                <div className="kv-item"><div className="kv-key">Status</div><div className="kv-val"><span className={`badge ${approved ? 'badge-success' : 'badge-danger'}`}>{approved ? '✔ Approved' : '✖ Rejected'}</span></div></div>
-                <div className="kv-item"><div className="kv-key">Requested Rate</div><div className="kv-val">{result.interest_rate}%</div></div>
-                <div className="kv-item"><div className="kv-key">Corrected Rate</div><div className="kv-val" style={{ color: result.corrected_interest_rate > result.interest_rate ? 'var(--warning)' : 'var(--success)' }}>{result.corrected_interest_rate}%</div></div>
-                <div className="kv-item"><div className="kv-key">Monthly EMI</div><div className="kv-val">₹{Number(result.monthly_installment).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div></div>
-                <div className="kv-item"><div className="kv-key">Tenure</div><div className="kv-val">{result.tenure} months</div></div>
-              </div>
-            </div>
-            {!approved && <div className="info-bar" style={{ marginTop: '1rem', marginBottom: 0 }}>ℹ️ Loan rejected — either total EMI exceeds 50% of salary or credit score is below 10.</div>}
-            {approved && result.corrected_interest_rate > result.interest_rate && (
-              <div className="info-bar" style={{ marginTop: '1rem', marginBottom: 0 }}>⚠️ Interest rate corrected from {result.interest_rate}% to <strong>{result.corrected_interest_rate}%</strong> based on your credit score slab.</div>
-            )}
-          </div>
-        )}
+        <ErrorPanel error={error} />
 
-        {error && (
-          <div className="result-panel result-error">
-            <div className="result-title" style={{ color: 'var(--danger)' }}>✖ Error</div>
-            <pre style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{JSON.stringify(error, null, 2)}</pre>
+        {/* Infographic callout (always visible) */}
+        <div className="mt-10 p-6 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 flex items-start gap-4">
+          <div className="w-12 h-12 rounded-xl bg-indigo-500/15 flex items-center justify-center flex-shrink-0">
+            <span className="material-symbols-outlined text-indigo-400">info</span>
           </div>
-        )}
+          <div>
+            <h4 className="text-on-surface font-semibold">Score Model: 4 Factors</h4>
+            <p className="text-on-surface-variant text-sm mt-1">
+              Payment history (40 pts) · Loan count (20 pts) · Current-year activity (20 pts) · Credit utilisation (20 pts)
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Right: Results ── */}
+      <div className="lg:col-span-5 space-y-6">
+        {/* Status panel */}
+        <div className="glass-panel p-8 rounded-3xl relative overflow-hidden">
+          <div className="absolute -right-12 -top-12 w-48 h-48 bg-primary/10 blur-[64px] rounded-full pointer-events-none" />
+          <div className="flex justify-between items-start mb-6">
+            <span className="lv-section-tag">Application Status</span>
+            <span className="px-3 py-1 bg-surface-container-highest text-on-surface-variant text-[0.65rem] font-bold rounded-full">
+              LIVE PREVIEW
+            </span>
+          </div>
+
+          {!result ? (
+            <div className="text-center py-12">
+              <span className="material-symbols-outlined text-5xl text-outline mb-4 block">pending</span>
+              <p className="text-on-surface-variant text-sm">Submit the form to see the credit assessment.</p>
+            </div>
+          ) : (
+            <div className="lv-result">
+              <div className="text-center py-4">
+                <div className={`inline-flex items-center justify-center px-8 py-4 rounded-full border mb-4 ${
+                  approved
+                    ? 'bg-primary/10 border-primary/30'
+                    : 'bg-error/10 border-error/30'
+                }`}>
+                  <span className={`text-4xl font-black tracking-tighter ${approved ? 'text-primary' : 'text-error'}`}>
+                    {approved ? 'Approved' : 'Rejected'}
+                  </span>
+                </div>
+                <p className="text-on-surface-variant text-sm">
+                  Credit assessment complete based on algorithmic risk scoring.
+                </p>
+              </div>
+
+              <CreditRing score={result.credit_score ?? 0} />
+
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Requested Rate', value: `${result.interest_rate}%` },
+                  { label: 'Corrected Rate',
+                    value: `${result.corrected_interest_rate}%`,
+                    highlight: result.corrected_interest_rate > result.interest_rate },
+                  { label: 'Monthly EMI',
+                    value: `₹${Number(result.monthly_installment).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+                  { label: 'Tenure',         value: `${result.tenure} months` },
+                ].map(item => (
+                  <div key={item.label} className="p-4 rounded-2xl bg-surface-container-low border border-white/5">
+                    <span className="lv-section-tag">{item.label}</span>
+                    <span className={`text-xl font-bold ${item.highlight ? 'text-tertiary' : 'text-on-surface'}`}>
+                      {item.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {!approved && (
+                <div className="mt-4 p-4 rounded-xl bg-error/5 border border-error/20 flex items-start gap-2">
+                  <span className="material-symbols-outlined text-error text-sm mt-0.5">warning</span>
+                  <p className="text-error text-xs">
+                    Rejected — total EMI exceeds 50% of salary or credit score is below 10.
+                  </p>
+                </div>
+              )}
+              {approved && result.corrected_interest_rate > result.interest_rate && (
+                <div className="mt-4 p-4 rounded-xl bg-tertiary/5 border border-tertiary/20 flex items-start gap-2">
+                  <span className="material-symbols-outlined text-tertiary text-sm mt-0.5">info</span>
+                  <p className="text-tertiary text-xs">
+                    Rate corrected from {result.interest_rate}% → <strong>{result.corrected_interest_rate}%</strong> based on credit score slab.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Eligibility summary bento */}
+        <div className="bg-surface-container-low p-6 rounded-3xl space-y-2 border border-white/5">
+          <h3 className="text-on-surface font-bold text-lg px-2 mb-4">Eligibility Criteria</h3>
+          {[
+            { icon: 'task_alt', label: 'Credit Score Analysis',  value: result ? `${result.credit_score ?? '—'} / 100`   : '—' },
+            { icon: 'task_alt', label: 'Rate Correction Applied', value: result ? (result.corrected_interest_rate > result.interest_rate ? 'Yes' : 'No') : '—' },
+            { icon: 'task_alt', label: 'Affordability Check',    value: result ? (result.approval ? 'Passed' : 'Failed') : '—' },
+          ].map(row => (
+            <div key={row.label} className="lv-kv-row">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-primary text-base">{row.icon}</span>
+                <span className="text-sm text-on-surface-variant">{row.label}</span>
+              </div>
+              <span className="text-sm font-bold text-on-surface">{row.value}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
